@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>com.ubuntu</groupId>
+    <groupId>com.queryexecution</groupId>
     <artifactId>queryexecution</artifactId>
     <version>1.0</version>
     <properties>
@@ -56,9 +56,9 @@
                         <!-- Usage: mvn clean javafx:run -->
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>com.ubuntu.App</mainClass>
+                            <mainClass>com.queryexecution.QueryExecution</mainClass>
                             <launcher>
-                                <name>QueryExecutorApp</name>
+                                <name>QueryExecution</name>
                             </launcher>
                             <options>
                                 <option>-Dprism.order=es2</option> <!-- Use the hardware-accelerated renderer -->

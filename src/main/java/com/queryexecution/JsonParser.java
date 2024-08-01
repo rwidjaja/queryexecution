@@ -1,4 +1,4 @@
-package com.ubuntu;
+package com.queryexecution;
 
 import org.json.JSONArray;
 import org.json.JSONObject;

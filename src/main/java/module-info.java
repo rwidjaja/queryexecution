@@ -5,5 +5,5 @@ module com.ubuntu {
     requires javafx.fxml;
     requires org.json;
     requires jakarta.activation; 
-    exports com.ubuntu;
+    exports com.queryexecution;
 }

@@ -1,4 +1,4 @@
-package com.ubuntu;
+package com.queryexecution;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -7,6 +7,9 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Document;
@@ -65,49 +68,51 @@ public class SQLQueryExecutor {
             }
 
             // Parse the XML response and format it as a table
-            return parseAndFormatXML(response.toString());
+            return response.toString(); // Return XML response as a string for further processing
         }
     }
-    private static String parseAndFormatXML(String xml) {
-        StringBuilder result = new StringBuilder();
-    
+
+    public static List<List<String>> parseXMLToRows(String xmlResult) {
+        List<List<String>> rowsList = new ArrayList<>();
+
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(new java.io.ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+            Document doc = builder.parse(new java.io.ByteArrayInputStream(xmlResult.getBytes(StandardCharsets.UTF_8)));
             doc.getDocumentElement().normalize();
-    
+            
             NodeList columns = doc.getElementsByTagName("column");
             NodeList rows = doc.getElementsByTagName("row");
-    
-            // Print column headers
+            
+            // Extract column headers
+            List<String> headers = new ArrayList<>();
             for (int i = 0; i < columns.getLength(); i++) {
                 Element column = (Element) columns.item(i);
                 if (column != null) {
                     NodeList names = column.getElementsByTagName("name");
                     if (names.getLength() > 0) {
-                        result.append(names.item(0).getTextContent()).append("\t");
+                        headers.add(names.item(0).getTextContent());
                     }
                 }
             }
-            result.append("\n");
-    
-            // Print rows
+            rowsList.add(headers);
+            
+            // Extract rows
             for (int i = 0; i < rows.getLength(); i++) {
                 NodeList rowColumns = rows.item(i).getChildNodes();
+                List<String> row = new ArrayList<>();
                 for (int j = 0; j < rowColumns.getLength(); j++) {
                     if (rowColumns.item(j) != null) {
-                        result.append(rowColumns.item(j).getTextContent()).append("\t");
+                        row.add(rowColumns.item(j).getTextContent());
                     }
                 }
-                result.append("\n");
+                rowsList.add(row);
             }
-    
+            
         } catch (Exception e) {
             e.printStackTrace();
-            return "Error parsing XML: " + e.getMessage();
         }
-    
-        return result.toString();
+        
+        return rowsList;
     }
 }

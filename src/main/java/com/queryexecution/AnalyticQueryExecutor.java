@@ -1,5 +1,4 @@
-package com.ubuntu;
-
+package com.queryexecution;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
