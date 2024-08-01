@@ -143,14 +143,14 @@ public class App extends Application {
         String hostname = hostnameField.getText();
         String queryType = queryTypeComboBox.getValue();
         String query = queryTextArea.getText();
-    
+
         try {
             if ("Analytic".equals(queryType)) {
-                AnalyticQueryExecutor.executeAnalyticQuery(jwtToken, projectName, cubeName, hostname, query);
-                resultTextArea.setText("Analytic query executed successfully.");
+                String result = AnalyticQueryExecutor.executeAnalyticQuery(jwtToken, projectName, cubeName, hostname, query);
+                resultTextArea.setText(result);
             } else if ("SQL".equals(queryType)) {
-                SQLQueryExecutor.executeSQLQuery(jwtToken, projectName, hostname, query);
-                resultTextArea.setText("SQL query executed successfully.");
+                String result = SQLQueryExecutor.executeSQLQuery(jwtToken, projectName, hostname, query);
+                resultTextArea.setText(result);
             } else {
                 resultTextArea.setText("Invalid query type selected.");
             }
