@@ -13,20 +13,24 @@ public class Authenticator {
 
     // Check if the host is I-2024
     public static boolean isI2024Host(String hostname) throws IOException {
-        URL url = new URL("https://" + hostname + ":10500/ping");
+        URL url = new URL("https://" + hostname + ":10502/ping");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
 
-        int responseCode = conn.getResponseCode();
-        if (responseCode == HttpURLConnection.HTTP_OK) {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
-                StringBuilder response = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    response.append(line);
+        try {
+            int responseCode = conn.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line);
+                    }
+                    return response.toString().contains("OK");
                 }
-                return response.toString().contains("**** design center OK ****");
             }
+        } catch (IOException e) {
+            // Handle any connection errors or exceptions
         }
         return false;
     }

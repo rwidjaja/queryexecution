@@ -4,8 +4,12 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
 import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.List;
 
 public class QueryExecutionEventHandler {
@@ -21,24 +25,26 @@ public class QueryExecutionEventHandler {
         String username = ui.getUsernameField().getText();
         String password = ui.getPasswordField().getText();
         String hostname = ui.getHostnameField().getText();
-
+    
         Task<Void> loginTask = new Task<>() {
             @Override
             protected Void call() throws Exception {
                 try {
-                    // Determine login type and authenticate
-                    if (Authenticator.isI2024Host(hostname)) {
-                        jwtToken = Authenticator.authenticateI2024(username, password, hostname);
+                    // Check if the host is I-2024
+                    boolean isI2024 = Authenticator.isI2024Host(hostname);
+    
+                    if (isI2024) {
                         loginType = "I";
+                        jwtToken = Authenticator.authenticateI2024(username, password, hostname);
                     } else {
-                        jwtToken = Authenticator.authenticateC2024(username, password, hostname);
                         loginType = "C";
+                        jwtToken = Authenticator.authenticateC2024(username, password, hostname);
                     }
-
+    
                     // Fetch and populate projects
-                    ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, hostname);
+                    ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, hostname, loginType);
                     List<String> projects = projectFetcher.fetchProjects();
-
+    
                     // Update UI on the JavaFX Application Thread
                     Platform.runLater(() -> {
                         ui.getProjectNameComboBox().getItems().setAll(projects);
@@ -64,7 +70,7 @@ public class QueryExecutionEventHandler {
                 @Override
                 protected Void call() throws Exception {
                     try {
-                        ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, ui.getHostnameField().getText());
+                        ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, ui.getHostnameField().getText(), loginType);
                         List<String> cubes = projectFetcher.fetchCubesForProject(selectedProject);
 
                         // Update UI on the JavaFX Application Thread

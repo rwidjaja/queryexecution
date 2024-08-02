@@ -174,7 +174,7 @@ public class QueryExecution extends Application {
 
     private void configureSSL() {
         // Set the path to your custom truststore and its password
-        System.setProperty("javax.net.ssl.trustStore", "/Volumes/4TB/Development/certificate/ubuntu-atscale/ubuntu-atscale.jks");
+        System.setProperty("javax.net.ssl.trustStore", "/Volumes/4TB/Development/LocalGit/GitRepo/queryexecution/cacerts");
         System.setProperty("javax.net.ssl.trustStorePassword", "password");
     }
 }
