@@ -1,17 +1,12 @@
 package com.queryexecution;
 
 import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.concurrent.Task;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-
 import java.util.List;
 
 public class QueryExecution extends Application {
@@ -27,11 +22,12 @@ public class QueryExecution extends Application {
     private Button executeButton;
     private Button loginButton;
     private Label statusLabel;
-    private String jwtToken;
+    private QueryExecutionEventHandler eventHandler;
 
     @Override
     public void start(Stage primaryStage) {
-        configureSSL();  // Configure SSL before starting the application
+        configureSSL(); 
+        eventHandler = new QueryExecutionEventHandler(this);
 
         primaryStage.setTitle("Query Executor");
 
@@ -51,7 +47,7 @@ public class QueryExecution extends Application {
         // Create UI elements for query input
         Label projectNameLabel = new Label("Project:");
         projectNameComboBox = new ComboBox<>();
-        projectNameComboBox.setOnAction(e -> handleProjectSelection());
+        projectNameComboBox.setOnAction(e -> eventHandler.handleProjectSelection());
 
         Label cubeNameLabel = new Label("Cube:");
         cubeNameComboBox = new ComboBox<>();
@@ -124,8 +120,56 @@ public class QueryExecution extends Application {
         primaryStage.show();
 
         // Set button actions
-        loginButton.setOnAction(e -> handleLogin());
-        executeButton.setOnAction(e -> handleExecuteQuery());
+        loginButton.setOnAction(e -> eventHandler.handleLogin());
+        executeButton.setOnAction(e -> eventHandler.handleExecuteQuery());
+    }
+
+    public TextField getHostnameField() {
+        return hostnameField;
+    }
+
+    public TextField getUsernameField() {
+        return usernameField;
+    }
+
+    public PasswordField getPasswordField() {
+        return passwordField;
+    }
+
+    public ComboBox<String> getProjectNameComboBox() {
+        return projectNameComboBox;
+    }
+
+    public ComboBox<String> getCubeNameComboBox() {
+        return cubeNameComboBox;
+    }
+
+    public ComboBox<String> getQueryTypeComboBox() {
+        return queryTypeComboBox;
+    }
+
+    public TextArea getQueryTextArea() {
+        return queryTextArea;
+    }
+
+    public TableView<List<String>> getResultTableView() {
+        return resultTableView;
+    }
+
+    public Button getExecuteButton() {
+        return executeButton;
+    }
+
+    public Button getLoginButton() {
+        return loginButton;
+    }
+
+    public Label getStatusLabel() {
+        return statusLabel;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 
     private void configureSSL() {
@@ -133,128 +177,4 @@ public class QueryExecution extends Application {
         System.setProperty("javax.net.ssl.trustStore", "/Volumes/4TB/Development/certificate/ubuntu-atscale/ubuntu-atscale.jks");
         System.setProperty("javax.net.ssl.trustStorePassword", "password");
     }
-
-    private void handleLogin() {
-        String username = usernameField.getText();
-        String password = passwordField.getText();
-        String hostname = hostnameField.getText();
-
-        Task<Void> loginTask = new Task<>() {
-            @Override
-            protected Void call() throws Exception {
-                try {
-                    // Handle login and get JWT token
-                    jwtToken = Authenticator.authenticate(username, password, hostname);
-
-                    // Fetch and populate projects
-                    ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, hostname);
-                    List<String> projects = projectFetcher.fetchProjects();
-
-                    // Update UI on the JavaFX Application Thread
-                    Platform.runLater(() -> {
-                        projectNameComboBox.getItems().setAll(projects);
-                        statusLabel.setText("Status: Login successful");
-                        executeButton.setDisable(false);
-                    });
-                } catch (Exception ex) {
-                    Platform.runLater(() -> {
-                        statusLabel.setText("Status: Error - " + ex.getMessage());
-                        executeButton.setDisable(true);
-                    });
-                }
-                return null;
-            }
-        };
-        new Thread(loginTask).start();
-    }
-
-    private void handleProjectSelection() {
-        String selectedProject = projectNameComboBox.getValue();
-        if (selectedProject != null) {
-            Task<Void> fetchCubesTask = new Task<>() {
-                @Override
-                protected Void call() throws Exception {
-                    try {
-                        ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, hostnameField.getText());
-                        List<String> cubes = projectFetcher.fetchCubesForProject(selectedProject);
-
-                        // Update UI on the JavaFX Application Thread
-                        Platform.runLater(() -> {
-                            cubeNameComboBox.getItems().setAll(cubes);
-                        });
-                    } catch (Exception ex) {
-                        Platform.runLater(() -> {
-                            statusLabel.setText("Status: Error fetching cubes - " + ex.getMessage());
-                        });
-                    }
-                    return null;
-                }
-            };
-            new Thread(fetchCubesTask).start();
-        }
-    }
-
-    private void handleExecuteQuery() {
-        String projectName = projectNameComboBox.getValue();
-        String cubeName = cubeNameComboBox.getValue();
-        String hostname = hostnameField.getText();
-        String queryType = queryTypeComboBox.getValue();
-        String query = queryTextArea.getText();
-
-        Task<List<List<String>>> executeQueryTask = new Task<>() {
-            @Override
-            protected List<List<String>> call() throws Exception {
-                try {
-                    String xmlResult;
-                    if ("Analytic".equals(queryType)) {
-                        xmlResult = AnalyticQueryExecutor.executeAnalyticQuery(jwtToken, projectName, cubeName, hostname, query);
-                    } else if ("SQL".equals(queryType)) {
-                        xmlResult = SQLQueryExecutor.executeSQLQuery(jwtToken, projectName, hostname, query);
-                    } else {
-                        return List.of(List.of("Invalid query type selected."));
-                    }
-
-                    return SQLQueryExecutor.parseXMLToRows(xmlResult);
-                } catch (Exception ex) {
-                    return List.of(List.of("Error: " + ex.getMessage()));
-                }
-            }
-
-            @Override
-            protected void succeeded() {
-                List<List<String>> rows = getValue();
-                updateTableView(rows);
-            }
-
-            @Override
-            protected void failed() {
-                resultTableView.getItems().clear();
-                resultTableView.getItems().add(List.of("Error: " + getException().getMessage()));
-            }
-        };
-        new Thread(executeQueryTask).start();
-    }
-
-    private void updateTableView(List<List<String>> rows) {
-        resultTableView.getColumns().clear();
-        resultTableView.getItems().clear();
-
-        if (rows.isEmpty()) {
-            return;
-        }
-        List<String> headers = rows.get(0);
-        for (int i = 0; i < headers.size(); i++) {
-            final int colIndex = i;
-            TableColumn<List<String>, String> column = new TableColumn<>(headers.get(i));
-            column.setCellValueFactory(cellData ->new SimpleStringProperty(cellData.getValue().get(colIndex)));
-            resultTableView.getColumns().add(column);
-            }
-            for (int i = 1; i < rows.size(); i++) {
-                resultTableView.getItems().add(rows.get(i));
-            }
-        }
-        
-        public static void main(String[] args) {
-            launch(args);
-        }
-    }
+}
