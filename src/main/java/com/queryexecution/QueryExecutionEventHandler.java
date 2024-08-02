@@ -104,7 +104,7 @@ public class QueryExecutionEventHandler {
                     if ("Analytic".equals(queryType)) {
                         xmlResult = AnalyticQueryExecutor.executeAnalyticQuery(jwtToken, projectName, cubeName, hostname, query);
                     } else if ("SQL".equals(queryType)) {
-                        xmlResult = SQLQueryExecutor.executeSQLQuery(jwtToken, projectName, hostname, query);
+                        xmlResult = SQLQueryExecutor.executeSQLQuery(jwtToken, projectName, hostname, query, loginType);
                     } else {
                         return List.of(List.of("Invalid query type selected."));
                     }

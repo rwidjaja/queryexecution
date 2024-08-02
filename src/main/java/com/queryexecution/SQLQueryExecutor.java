@@ -18,8 +18,18 @@ import org.w3c.dom.NodeList;
 
 public class SQLQueryExecutor {
 
-    public static String executeSQLQuery(String jwt, String projectName, String hostname, String query) throws IOException {
-        URL url = new URL("https", hostname, 10502, "/query/orgId/default/submit");
+    public static String executeSQLQuery(String jwt, String projectName, String hostname, String query, String loginType) throws IOException {
+        // Determine the URL and port based on loginType
+        String urlStr;
+        if ("I".equals(loginType)) {
+            urlStr = String.format("https://%s:10502/query/orgId/default/submit", hostname);
+        } else if ("C".equals(loginType)) {
+            urlStr = String.format("https://%s/engine/query/submit", hostname);
+        } else {
+            throw new IllegalArgumentException("Invalid loginType: " + loginType);
+        }
+
+        URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Authorization", "Bearer " + jwt);
