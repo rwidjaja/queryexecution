@@ -102,7 +102,7 @@ public class QueryExecutionEventHandler {
                 try {
                     String xmlResult;
                     if ("Analytic".equals(queryType)) {
-                        xmlResult = AnalyticQueryExecutor.executeAnalyticQuery(jwtToken, projectName, cubeName, hostname, query);
+                        xmlResult = AnalyticQueryExecutor.executeAnalyticQuery(jwtToken, projectName, cubeName, hostname, query, loginType);
                     } else if ("SQL".equals(queryType)) {
                         xmlResult = SQLQueryExecutor.executeSQLQuery(jwtToken, projectName, hostname, query, loginType);
                     } else {

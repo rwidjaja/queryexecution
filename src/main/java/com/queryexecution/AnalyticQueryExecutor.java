@@ -1,4 +1,5 @@
 package com.queryexecution;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -20,8 +21,18 @@ import java.util.Iterator;
 
 public class AnalyticQueryExecutor {
 
-    public static String executeAnalyticQuery(String jwt, String projectName, String cubeName, String hostname, String query) throws IOException {
-        URL url = new URL("https", hostname, 10502, "/xmla/default");
+    public static String executeAnalyticQuery(String jwt, String projectName, String cubeName, String hostname, String query, String loginType) throws IOException {
+        // Determine the URL endpoint based on loginType
+        String urlStr;
+        if ("I".equals(loginType)) {
+            urlStr = String.format("https://%s:10502/xmla/default", hostname);
+        } else if ("C".equals(loginType)) {
+            urlStr = String.format("https://%s/engine/xmla", hostname);
+        } else {
+            throw new IllegalArgumentException("Invalid loginType: " + loginType);
+        }
+
+        URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Authorization", "Bearer " + jwt);
