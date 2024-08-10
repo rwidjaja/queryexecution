@@ -1,9 +1,12 @@
 package com.queryexecution;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import javax.xml.parsers.DocumentBuilder;
@@ -12,6 +15,10 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
+import javafx.application.Platform;
+import javafx.scene.control.Label;
+import javafx.scene.control.TitledPane;
+import javafx.scene.layout.VBox;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
@@ -24,6 +31,7 @@ public class AnalyticQueryExecutor {
     public static String executeAnalyticQuery(String jwt, String projectName, String cubeName, String hostname, String query, String loginType) throws IOException {
         // Determine the URL endpoint based on loginType
         String urlStr;
+        String message;
         if ("I".equals(loginType)) {
             urlStr = String.format("https://%s:10502/xmla/default", hostname);
         } else if ("C".equals(loginType)) {
@@ -86,8 +94,38 @@ public class AnalyticQueryExecutor {
             }
 
             // Parse the XML response and format it
-            return parseAndFormatXML(response.toString());
+           // return parseAndFormatXML(response.toString());
+    // Debug: Print the raw XML response for verification
+    //String rawXmlResponse = response.toString();
+    // System.out.println("Raw XML Response:\n" + rawXmlResponse);
+
+       // Handle BOM if present
+      // Save the response to a file
+            try (PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("/tmp/analytic_output.soap")))) {
+                out.println(response.toString());
+            }
+
+            message = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                 "<Response>\n" +
+                 "    <columns>\n" +
+                 "        <column>\n" +
+                 "            <name>Status</name>\n" +
+                 "        </column>\n" +
+                 "        <column>\n" +
+                 "            <name>OutputFile</name>\n" +
+                 "        </column>\n" +
+                 "    </columns>\n" +
+                 "    <rows>\n" +
+                 "        <row>\n" +
+                 "            <Status>Query Completed</Status>\n" +
+                 "            <OutputFile>/tmp/analytic_output.soap</OutputFile>\n" +
+                 "        </row>\n" +
+                 "    </rows>\n" +
+                 "</Response>";
+
         }
+       
+        return message;
     }
 
     private static String parseAndFormatXML(String xml) {
@@ -163,4 +201,5 @@ public class AnalyticQueryExecutor {
 
         return result.toString();
     }
-}
+
+    }

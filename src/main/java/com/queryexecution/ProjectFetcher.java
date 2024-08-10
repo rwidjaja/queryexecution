@@ -60,7 +60,7 @@ public class ProjectFetcher {
         List<String> projectNames = new ArrayList<>();
         
         // Debugging output
-        System.out.println("Raw Response: " + response);
+       // System.out.println("Raw Response: " + response);
         
         if (loginType.equals("I")) {
             JSONObject jsonObject = new JSONObject(response);
@@ -96,7 +96,7 @@ public class ProjectFetcher {
         List<String> cubeNames = new ArrayList<>();
         
         // Debugging output
-        System.out.println("Raw Response: " + response);
+      //  System.out.println("Raw Response: " + response);
         
         if (loginType.equals("I")) {
             JSONObject jsonObject = new JSONObject(response);

@@ -108,7 +108,6 @@ public class QueryExecutionEventHandler {
                     } else {
                         return List.of(List.of("Invalid query type selected."));
                     }
-
                     return SQLQueryExecutor.parseXMLToRows(xmlResult);
                 } catch (Exception ex) {
                     return List.of(List.of("Error: " + ex.getMessage()));
@@ -137,7 +136,10 @@ public class QueryExecutionEventHandler {
         if (rows.isEmpty()) {
             return;
         }
+
         List<String> headers = rows.get(0);
+   //   For Debug
+   //     System.out.println("XML Result: " + headers);
         for (int i = 0; i < headers.size(); i++) {
             final int colIndex = i;
             TableColumn<List<String>, String> column = new TableColumn<>(headers.get(i));
