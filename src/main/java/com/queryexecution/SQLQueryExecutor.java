@@ -49,7 +49,7 @@ public class SQLQueryExecutor {
         );
 
         // Debug: print the payload
-        System.out.println("Payload for SQL query: " + payload);
+      //  System.out.println("Payload for SQL query: " + payload);
 
         try (OutputStream os = conn.getOutputStream()) {
             os.write(payload.getBytes(StandardCharsets.UTF_8));
