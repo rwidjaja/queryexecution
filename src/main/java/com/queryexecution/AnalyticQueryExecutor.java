@@ -2,8 +2,8 @@ package com.queryexecution;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.IOException;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -15,10 +15,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
-import javafx.application.Platform;
-import javafx.scene.control.Label;
-import javafx.scene.control.TitledPane;
-import javafx.scene.layout.VBox;
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
@@ -31,7 +27,6 @@ public class AnalyticQueryExecutor {
     public static String executeAnalyticQuery(String jwt, String projectName, String cubeName, String hostname, String query, String loginType) throws IOException {
         // Determine the URL endpoint based on loginType
         String urlStr;
-        String message;
         if ("I".equals(loginType)) {
             urlStr = String.format("https://%s:10502/xmla/default", hostname);
         } else if ("C".equals(loginType)) {
@@ -40,92 +35,88 @@ public class AnalyticQueryExecutor {
             throw new IllegalArgumentException("Invalid loginType: " + loginType);
         }
 
-        URL url = new URL(urlStr);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Authorization", "Bearer " + jwt);
-        conn.setRequestProperty("Content-Type", "application/xml");
-        conn.setDoOutput(true);
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Authorization", "Bearer " + jwt);
+            conn.setRequestProperty("Content-Type", "application/xml");
+            conn.setDoOutput(true);
 
-        String xmlPayload = String.format(
-            "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">" +
-            "<soap:Body>" +
-            "<Execute xmlns=\"urn:schemas-microsoft-com:xml-analysis\">" +
-            "<Command>" +
-            "<Statement><![CDATA[%s]]></Statement>" +
-            "</Command>" +
-            "<Properties>" +
-            "<PropertyList>" +
-            "<Catalog>%s</Catalog>" +
-            "<Cube>%s</Cube>" +
-            "</PropertyList>" +
-            "</Properties>" +
-            "</Execute>" +
-            "</soap:Body>" +
-            "</soap:Envelope>",
-            query, projectName, cubeName
-        );
+            String xmlPayload = String.format(
+                "<soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\">" +
+                "<soap:Body>" +
+                "<Execute xmlns=\"urn:schemas-microsoft-com:xml-analysis\">" +
+                "<Command>" +
+                "<Statement><![CDATA[%s]]></Statement>" +
+                "</Command>" +
+                "<Properties>" +
+                "<PropertyList>" +
+                "<Catalog>%s</Catalog>" +
+                "<Cube>%s</Cube>" +
+                "</PropertyList>" +
+                "</Properties>" +
+                "</Execute>" +
+                "</soap:Body>" +
+                "</soap:Envelope>",
+                query, projectName, cubeName
+            );
 
-        // Send the request
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(xmlPayload.getBytes());
-            os.flush();
-        }
-
-        int responseCode = conn.getResponseCode();
-        if (responseCode != 200) {
-            // Read and log the response body for more details
-            StringBuilder response = new StringBuilder();
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getErrorStream()))) {
-                String inputLine;
-                while ((inputLine = in.readLine()) != null) {
-                    response.append(inputLine);
-                }
+            // Send the request
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(xmlPayload.getBytes());
+                os.flush();
             }
-            throw new IOException("Analytic query execution failed: HTTP response code " + responseCode + " - Response body: " + response.toString());
-        } else {
-            // Read and return the response body
+
+            int responseCode = conn.getResponseCode();
             StringBuilder response = new StringBuilder();
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(
+                    (responseCode == HttpURLConnection.HTTP_OK) ? conn.getInputStream() : conn.getErrorStream()))) {
                 String inputLine;
                 while ((inputLine = in.readLine()) != null) {
                     response.append(inputLine);
                 }
             }
 
-            // Parse the XML response and format it
-           // return parseAndFormatXML(response.toString());
-    // Debug: Print the raw XML response for verification
-    //String rawXmlResponse = response.toString();
-    // System.out.println("Raw XML Response:\n" + rawXmlResponse);
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw new IOException("Analytic query execution failed: HTTP response code " + responseCode + " - Response body: " + response.toString());
+            }
 
-       // Handle BOM if present
-      // Save the response to a file
+            // Save the response to a file
             try (PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("/tmp/analytic_output.soap")))) {
                 out.println(response.toString());
+            } catch (IOException e) {
+                System.err.println("Error writing response to file: " + e.getMessage());
+                throw e;
             }
 
-            message = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                 "<Response>\n" +
-                 "    <columns>\n" +
-                 "        <column>\n" +
-                 "            <name>Status</name>\n" +
-                 "        </column>\n" +
-                 "        <column>\n" +
-                 "            <name>OutputFile</name>\n" +
-                 "        </column>\n" +
-                 "    </columns>\n" +
-                 "    <rows>\n" +
-                 "        <row>\n" +
-                 "            <Status>Query Completed</Status>\n" +
-                 "            <OutputFile>/tmp/analytic_output.soap</OutputFile>\n" +
-                 "        </row>\n" +
-                 "    </rows>\n" +
-                 "</Response>";
+            return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                   "<Response>\n" +
+                   "    <columns>\n" +
+                   "        <column>\n" +
+                   "            <name>Status</name>\n" +
+                   "        </column>\n" +
+                   "        <column>\n" +
+                   "            <name>OutputFile</name>\n" +
+                   "        </column>\n" +
+                   "    </columns>\n" +
+                   "    <rows>\n" +
+                   "        <row>\n" +
+                   "            <Status>Query Completed</Status>\n" +
+                   "            <OutputFile>/tmp/analytic_output.soap</OutputFile>\n" +
+                   "        </row>\n" +
+                   "    </rows>\n" +
+                   "</Response>";
 
+        } catch (IOException e) {
+            System.err.println("Error executing analytic query: " + e.getMessage());
+            throw e;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
-       
-        return message;
     }
 
     private static String parseAndFormatXML(String xml) {
@@ -140,9 +131,6 @@ public class AnalyticQueryExecutor {
 
             // Normalize the XML document
             doc.getDocumentElement().normalize();
-
-            // Debug: Print the raw XML for verification
-            System.out.println("Raw XML Response:\n" + xml);
 
             // Use XPath to query elements, considering namespaces
             XPathFactory xPathFactory = XPathFactory.newInstance();
@@ -195,11 +183,10 @@ public class AnalyticQueryExecutor {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Error parsing XML: " + e.getMessage());
             return "Error parsing XML: " + e.getMessage();
         }
 
         return result.toString();
     }
-
-    }
+}

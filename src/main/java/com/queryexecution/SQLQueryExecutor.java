@@ -12,6 +12,7 @@ import java.util.List;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -19,7 +20,6 @@ import org.w3c.dom.NodeList;
 public class SQLQueryExecutor {
 
     public static String executeSQLQuery(String jwt, String projectName, String hostname, String query, String loginType) throws IOException {
-        // Determine the URL and port based on loginType
         String urlStr;
         if ("I".equals(loginType)) {
             urlStr = String.format("https://%s:10502/query/orgId/default/submit", hostname);
@@ -29,46 +29,46 @@ public class SQLQueryExecutor {
             throw new IllegalArgumentException("Invalid loginType: " + loginType);
         }
 
-        URL url = new URL(urlStr);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Authorization", "Bearer " + jwt);
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setDoOutput(true);
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Authorization", "Bearer " + jwt);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
 
-        // Properly escape the query for JSON
-        String escapedQuery = query.replace("\\", "\\\\")
-                                   .replace("\"", "\\\"")
-                                   .replace("\n", "\\n")
-                                   .replace("\r", "\\r");
+            String escapedQuery = query.replace("\\", "\\\\")
+                                       .replace("\"", "\\\"")
+                                       .replace("\n", "\\n")
+                                       .replace("\r", "\\r");
 
-        // Define the payload for the SQL query
-        String payload = String.format(
-            "{ \"language\": \"SQL\", \"query\": \"%s\", \"context\": { \"organization\": { \"id\": \"default\" }, \"environment\": { \"id\": \"default\" }, \"project\": { \"name\": \"%s\" } }, \"aggregation\": { \"useAggregates\": false, \"genAggregates\": false }, \"fakeResults\": false, \"dryRun\": false, \"useLocalCache\": true, \"timeout\": \"2.minutes\" }",
-            escapedQuery, projectName
-        );
+            String payload = String.format(
+                "{ \"language\": \"SQL\", \"query\": \"%s\", \"context\": { \"organization\": { \"id\": \"default\" }, \"environment\": { \"id\": \"default\" }, \"project\": { \"name\": \"%s\" } }, \"aggregation\": { \"useAggregates\": false, \"genAggregates\": false }, \"fakeResults\": false, \"dryRun\": false, \"useLocalCache\": true, \"timeout\": \"2.minutes\" }",
+                escapedQuery, projectName
+            );
 
-        // Debug: print the payload
-      //  System.out.println("Payload for SQL query: " + payload);
+            // Debugging purposes
+           // System.out.println("Payload: " + payload);
 
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(payload.getBytes(StandardCharsets.UTF_8));
-            os.flush();
-        }
-
-        int responseCode = conn.getResponseCode();
-        if (responseCode != 200) {
-            // Read and log the response body for more details
-            StringBuilder response = new StringBuilder();
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getErrorStream()))) {
-                String inputLine;
-                while ((inputLine = in.readLine()) != null) {
-                    response.append(inputLine);
-                }
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(payload.getBytes(StandardCharsets.UTF_8));
+                os.flush();
             }
-            throw new IOException("SQL query execution failed: HTTP response code " + responseCode + " - Response body: " + response.toString());
-        } else {
-            // Read and return the response body
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                StringBuilder errorResponse = new StringBuilder();
+                try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream()))) {
+                    String inputLine;
+                    while ((inputLine = errorReader.readLine()) != null) {
+                        errorResponse.append(inputLine);
+                    }
+                }
+                throw new IOException("SQL query execution failed: HTTP response code " + responseCode + " - Response body: " + errorResponse.toString());
+            }
+
+            // Read successful response
             StringBuilder response = new StringBuilder();
             try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
                 String inputLine;
@@ -76,9 +76,15 @@ public class SQLQueryExecutor {
                     response.append(inputLine);
                 }
             }
+            return response.toString();
 
-            // Parse the XML response and format it as a table
-            return response.toString(); // Return XML response as a string for further processing
+        } catch (IOException e) {
+            System.err.println("Error executing SQL query: " + e.getMessage());
+            throw e;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
     }
 
@@ -90,10 +96,10 @@ public class SQLQueryExecutor {
             DocumentBuilder builder = factory.newDocumentBuilder();
             Document doc = builder.parse(new java.io.ByteArrayInputStream(xmlResult.getBytes(StandardCharsets.UTF_8)));
             doc.getDocumentElement().normalize();
-            
+
             NodeList columns = doc.getElementsByTagName("column");
             NodeList rows = doc.getElementsByTagName("row");
-            
+
             // Extract column headers
             List<String> headers = new ArrayList<>();
             for (int i = 0; i < columns.getLength(); i++) {
@@ -106,7 +112,7 @@ public class SQLQueryExecutor {
                 }
             }
             rowsList.add(headers);
-            
+
             // Extract rows
             for (int i = 0; i < rows.getLength(); i++) {
                 NodeList rowColumns = rows.item(i).getChildNodes();
@@ -118,11 +124,12 @@ public class SQLQueryExecutor {
                 }
                 rowsList.add(row);
             }
-            
+
         } catch (Exception e) {
+            System.err.println("Error parsing XML response: " + e.getMessage());
             e.printStackTrace();
         }
-        
+
         return rowsList;
     }
 }

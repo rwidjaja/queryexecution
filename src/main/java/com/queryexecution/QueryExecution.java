@@ -26,7 +26,7 @@ public class QueryExecution extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        configureSSL(); 
+        configureSSL();  // Handle any errors related to SSL configuration here
         eventHandler = new QueryExecutionEventHandler(this);
 
         primaryStage.setTitle("Query Executor");
@@ -47,7 +47,13 @@ public class QueryExecution extends Application {
         // Create UI elements for query input
         Label projectNameLabel = new Label("Project:");
         projectNameComboBox = new ComboBox<>();
-        projectNameComboBox.setOnAction(e -> eventHandler.handleProjectSelection());
+        projectNameComboBox.setOnAction(e -> {
+            try {
+                eventHandler.handleProjectSelection();
+            } catch (Exception ex) {
+                showError("Error selecting project: " + ex.getMessage());
+            }
+        });
 
         Label cubeNameLabel = new Label("Cube:");
         cubeNameComboBox = new ComboBox<>();
@@ -120,8 +126,21 @@ public class QueryExecution extends Application {
         primaryStage.show();
 
         // Set button actions
-        loginButton.setOnAction(e -> eventHandler.handleLogin());
-        executeButton.setOnAction(e -> eventHandler.handleExecuteQuery());
+        loginButton.setOnAction(e -> {
+            try {
+                eventHandler.handleLogin();
+            } catch (Exception ex) {
+                showError("Login failed: " + ex.getMessage());
+            }
+        });
+
+        executeButton.setOnAction(e -> {
+            try {
+                eventHandler.handleExecuteQuery();
+            } catch (Exception ex) {
+                showError("Query execution failed: " + ex.getMessage());
+            }
+        });
     }
 
     public TextField getHostnameField() {
@@ -173,8 +192,18 @@ public class QueryExecution extends Application {
     }
 
     private void configureSSL() {
-        // Set the path to your custom truststore and its password
-        System.setProperty("javax.net.ssl.trustStore", "./cacerts");
-        System.setProperty("javax.net.ssl.trustStorePassword", "password");
+        try {
+            // Set the path to your custom truststore and its password
+            System.setProperty("javax.net.ssl.trustStore", "./cacerts");
+            System.setProperty("javax.net.ssl.trustStorePassword", "password");
+        } catch (Exception e) {
+            showError("SSL configuration failed: " + e.getMessage());
+        }
+    }
+
+    // Helper method to display error messages
+    private void showError(String message) {
+        statusLabel.setText("Error: " + message);
+        statusLabel.setStyle("-fx-text-fill: red;"); // Change text color to red for errors
     }
 }

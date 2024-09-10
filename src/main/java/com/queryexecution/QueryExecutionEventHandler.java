@@ -5,11 +5,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
 import javafx.scene.control.TableColumn;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.List;
 
 public class QueryExecutionEventHandler {
@@ -25,14 +21,14 @@ public class QueryExecutionEventHandler {
         String username = ui.getUsernameField().getText();
         String password = ui.getPasswordField().getText();
         String hostname = ui.getHostnameField().getText();
-    
+
         Task<Void> loginTask = new Task<>() {
             @Override
-            protected Void call() throws Exception {
+            protected Void call() {
                 try {
                     // Check if the host is I-2024
                     boolean isI2024 = Authenticator.isI2024Host(hostname);
-    
+
                     if (isI2024) {
                         loginType = "I";
                         jwtToken = Authenticator.authenticateI2024(username, password, hostname);
@@ -40,22 +36,21 @@ public class QueryExecutionEventHandler {
                         loginType = "C";
                         jwtToken = Authenticator.authenticateC2024(username, password, hostname);
                     }
-    
+
                     // Fetch and populate projects
                     ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, hostname, loginType);
                     List<String> projects = projectFetcher.fetchProjects();
-    
+
                     // Update UI on the JavaFX Application Thread
                     Platform.runLater(() -> {
                         ui.getProjectNameComboBox().getItems().setAll(projects);
                         ui.getStatusLabel().setText("Status: Login successful");
                         ui.getExecuteButton().setDisable(false);
                     });
+                } catch (IOException ex) {
+                    handleError("Network error during login: " + ex.getMessage());
                 } catch (Exception ex) {
-                    Platform.runLater(() -> {
-                        ui.getStatusLabel().setText("Status: Error - " + ex.getMessage());
-                        ui.getExecuteButton().setDisable(true);
-                    });
+                    handleError("Error during login: " + ex.getMessage());
                 }
                 return null;
             }
@@ -68,7 +63,7 @@ public class QueryExecutionEventHandler {
         if (selectedProject != null) {
             Task<Void> fetchCubesTask = new Task<>() {
                 @Override
-                protected Void call() throws Exception {
+                protected Void call() {
                     try {
                         ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, ui.getHostnameField().getText(), loginType);
                         List<String> cubes = projectFetcher.fetchCubesForProject(selectedProject);
@@ -77,10 +72,10 @@ public class QueryExecutionEventHandler {
                         Platform.runLater(() -> {
                             ui.getCubeNameComboBox().getItems().setAll(cubes);
                         });
+                    } catch (IOException ex) {
+                        handleError("Network error while fetching cubes: " + ex.getMessage());
                     } catch (Exception ex) {
-                        Platform.runLater(() -> {
-                            ui.getStatusLabel().setText("Status: Error fetching cubes - " + ex.getMessage());
-                        });
+                        handleError("Error fetching cubes: " + ex.getMessage());
                     }
                     return null;
                 }
@@ -98,7 +93,7 @@ public class QueryExecutionEventHandler {
 
         Task<List<List<String>>> executeQueryTask = new Task<>() {
             @Override
-            protected List<List<String>> call() throws Exception {
+            protected List<List<String>> call() {
                 try {
                     String xmlResult;
                     if ("Analytic".equals(queryType)) {
@@ -106,11 +101,15 @@ public class QueryExecutionEventHandler {
                     } else if ("SQL".equals(queryType)) {
                         xmlResult = SQLQueryExecutor.executeSQLQuery(jwtToken, projectName, hostname, query, loginType);
                     } else {
-                        return List.of(List.of("Invalid query type selected."));
+                        throw new IllegalArgumentException("Invalid query type selected.");
                     }
                     return SQLQueryExecutor.parseXMLToRows(xmlResult);
-                } catch (Exception ex) {
+                } catch (IOException ex) {
+                    return List.of(List.of("Network error: " + ex.getMessage()));
+                } catch (IllegalArgumentException ex) {
                     return List.of(List.of("Error: " + ex.getMessage()));
+                } catch (Exception ex) {
+                    return List.of(List.of("Error executing query: " + ex.getMessage()));
                 }
             }
 
@@ -134,12 +133,11 @@ public class QueryExecutionEventHandler {
         ui.getResultTableView().getItems().clear();
 
         if (rows.isEmpty()) {
+            ui.getResultTableView().getItems().add(List.of("No results found."));
             return;
         }
 
         List<String> headers = rows.get(0);
-   //   For Debug
-   //     System.out.println("XML Result: " + headers);
         for (int i = 0; i < headers.size(); i++) {
             final int colIndex = i;
             TableColumn<List<String>, String> column = new TableColumn<>(headers.get(i));
@@ -149,5 +147,12 @@ public class QueryExecutionEventHandler {
         for (int i = 1; i < rows.size(); i++) {
             ui.getResultTableView().getItems().add(rows.get(i));
         }
+    }
+
+    private void handleError(String errorMessage) {
+        Platform.runLater(() -> {
+            ui.getStatusLabel().setText("Status: " + errorMessage);
+            ui.getExecuteButton().setDisable(true);
+        });
     }
 }
