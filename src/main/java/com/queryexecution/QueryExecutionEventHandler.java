@@ -46,6 +46,7 @@ public class QueryExecutionEventHandler {
                         ui.getProjectNameComboBox().getItems().setAll(projects);
                         ui.getStatusLabel().setText("Status: Login successful");
                         ui.getExecuteButton().setDisable(false);
+                        ui.getQueryHistoryButton().setDisable(false);
                     });
                 } catch (IOException ex) {
                     handleError("Network error during login: " + ex.getMessage());
@@ -58,7 +59,8 @@ public class QueryExecutionEventHandler {
         new Thread(loginTask).start();
     }
 
-    public void handleProjectSelection() {
+
+    public void handleProjectSelection() throws IOException {
         String selectedProject = ui.getProjectNameComboBox().getValue();
         if (selectedProject != null) {
             Task<Void> fetchCubesTask = new Task<>() {
@@ -116,7 +118,7 @@ public class QueryExecutionEventHandler {
             @Override
             protected void succeeded() {
                 List<List<String>> rows = getValue();
-                updateTableView(rows);
+                updateResultTable(rows);
             }
 
             @Override
@@ -128,25 +130,29 @@ public class QueryExecutionEventHandler {
         new Thread(executeQueryTask).start();
     }
 
-    private void updateTableView(List<List<String>> rows) {
-        ui.getResultTableView().getColumns().clear();
-        ui.getResultTableView().getItems().clear();
+    private void updateResultTable(List<List<String>> results) {
+        ui.getResultTableView().getColumns().clear(); // Clear existing columns
 
-        if (rows.isEmpty()) {
-            ui.getResultTableView().getItems().add(List.of("No results found."));
-            return;
-        }
+        if (results.isEmpty()) return;
 
-        List<String> headers = rows.get(0);
-        for (int i = 0; i < headers.size(); i++) {
+        // Add columns based on the result set
+        for (int i = 0; i < results.get(0).size(); i++) {
+            TableColumn<List<String>, String> column = new TableColumn<>("Column " + (i + 1));
             final int colIndex = i;
-            TableColumn<List<String>, String> column = new TableColumn<>(headers.get(i));
             column.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().get(colIndex)));
             ui.getResultTableView().getColumns().add(column);
         }
-        for (int i = 1; i < rows.size(); i++) {
-            ui.getResultTableView().getItems().add(rows.get(i));
-        }
+
+        // Add rows to the table
+        ui.getResultTableView().getItems().setAll(results);
+    }
+
+    public String getJwtToken() {
+        return jwtToken;
+    }
+
+    public String getLoginType() {
+        return loginType;
     }
 
     private void handleError(String errorMessage) {

@@ -5,6 +5,7 @@ import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import java.util.List;
@@ -21,6 +22,7 @@ public class QueryExecution extends Application {
     private TableView<List<String>> resultTableView;
     private Button executeButton;
     private Button loginButton;
+    private Button queryHistoryButton;
     private Label statusLabel;
     private QueryExecutionEventHandler eventHandler;
 
@@ -67,7 +69,13 @@ public class QueryExecution extends Application {
         queryTextArea.setPrefSize(600, 200); // Increase size of TextArea
 
         executeButton = new Button("Execute");
-        executeButton.setDisable(true);  // Initially disabled
+        queryHistoryButton = new Button("Query History");
+        executeButton.setDisable(true);
+        queryHistoryButton.setDisable(true);
+
+        // Create an HBox to contain both buttons
+        HBox buttonBox = new HBox(10); // Spacing of 10 between buttons
+        buttonBox.getChildren().addAll(executeButton, queryHistoryButton);
 
         // Create UI elements for result display
         resultTableView = new TableView<>();
@@ -105,7 +113,7 @@ public class QueryExecution extends Application {
         queryGrid.add(queryTypeComboBox, 1, 2);
         queryGrid.add(queryLabel, 0, 3);
         queryGrid.add(queryTextArea, 1, 3, 2, 1);
-        queryGrid.add(executeButton, 1, 4);
+        queryGrid.add(buttonBox, 1, 4); // Add the HBox with buttons
 
         TitledPane queryPane = new TitledPane("Query Input", queryGrid);
         queryPane.setCollapsible(false); // Ensure the pane is not collapsible
@@ -139,6 +147,22 @@ public class QueryExecution extends Application {
                 eventHandler.handleExecuteQuery();
             } catch (Exception ex) {
                 showError("Query execution failed: " + ex.getMessage());
+            }
+        });
+
+        queryHistoryButton.setOnAction(e -> {
+            try {
+                String jwtToken = eventHandler.getJwtToken(); // Use the token retrieved during login
+                String hostname = hostnameField.getText();
+                String loginType = eventHandler.getLoginType(); // Get the login type from event handler
+                CheckBox httpFlag = new CheckBox(); // Update with actual HTTP/HTTPS flag if applicable
+
+                // Create and show QueryHistoryUI
+                Stage queryHistoryStage = new Stage();
+                QueryHistoryUI queryHistoryUI = new QueryHistoryUI(queryHistoryStage, jwtToken, hostname, loginType, httpFlag);
+                queryHistoryStage.show(); // Use the show method to display the UI
+            } catch (Exception ex) {
+                showError("Error displaying query history: " + ex.getMessage());
             }
         });
     }
@@ -179,6 +203,10 @@ public class QueryExecution extends Application {
         return executeButton;
     }
 
+    public Button getQueryHistoryButton() {
+        return queryHistoryButton;
+    }
+
     public Button getLoginButton() {
         return loginButton;
     }
@@ -201,8 +229,8 @@ public class QueryExecution extends Application {
         }
     }
 
-    // Helper method to display error messages
-    private void showError(String message) {
+    // Changed visibility to protected
+    protected void showError(String message) {
         statusLabel.setText("Error: " + message);
         statusLabel.setStyle("-fx-text-fill: red;"); // Change text color to red for errors
     }
