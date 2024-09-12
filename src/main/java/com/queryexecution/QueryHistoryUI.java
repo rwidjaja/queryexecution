@@ -6,6 +6,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.util.Callback;
 
 import java.util.List;
 
@@ -70,6 +71,12 @@ public class QueryHistoryUI {
 
         // Create ListView for displaying detailed query information
         queryDetailsListView = new ListView<>();
+        queryDetailsListView.setCellFactory(new Callback<ListView<String>, ListCell<String>>() {
+            @Override
+            public ListCell<String> call(ListView<String> param) {
+                return new QueryDetailCell();
+            }
+        });
 
         // Layout configuration
         GridPane grid = new GridPane();
@@ -127,16 +134,19 @@ public class QueryHistoryUI {
     }
 
     // Handle the selection of a query ID from the query history table
-    private void handleQuerySelection(String queryID) {
-        try {
-            List<String> queryDetails = queryDetailFetcher.fetchQueryDetails(queryID);
-            queryDetailsListView.getItems().clear();
-            queryDetailsListView.getItems().addAll(queryDetails);
-        } catch (Exception e) {
-            e.printStackTrace();
-            showErrorDialog("Error retrieving query details", e.getMessage());
-        }
+// Handle the selection of a query ID from the query history table
+private void handleQuerySelection(String queryID) {
+    try {
+        List<String> queryDetails = queryDetailFetcher.fetchQueryDetails(queryID);
+        queryDetailsListView.getItems().clear();
+        queryDetailsListView.getItems().addAll(queryDetails);  // This will trigger the custom cell factory
+    } catch (Exception e) {
+        e.printStackTrace();
+        showErrorDialog("Error retrieving query details", e.getMessage());
     }
+}
+
+
 
     // Show error dialog in case of failure
     private void showErrorDialog(String title, String message) {
