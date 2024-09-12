@@ -13,9 +13,11 @@ import java.util.List;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
+import org.w3c.dom.Node;
 
 public class SQLQueryExecutor {
 
@@ -49,7 +51,7 @@ public class SQLQueryExecutor {
             );
 
             // Debugging purposes
-           // System.out.println("Payload: " + payload);
+            // System.out.println("Payload: " + payload);
 
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(payload.getBytes(StandardCharsets.UTF_8));
@@ -68,6 +70,7 @@ public class SQLQueryExecutor {
                 throw new IOException("SQL query execution failed: HTTP response code " + responseCode + " - Response body: " + errorResponse.toString());
             }
 
+
             // Read successful response
             StringBuilder response = new StringBuilder();
             try (BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
@@ -76,6 +79,10 @@ public class SQLQueryExecutor {
                     response.append(inputLine);
                 }
             }
+
+                        // Debugging: Print the raw inbound result
+                     //   System.out.println("Raw response from server: " + response.toString());
+                        
             return response.toString();
 
         } catch (IOException e) {
@@ -90,46 +97,71 @@ public class SQLQueryExecutor {
 
     public static List<List<String>> parseXMLToRows(String xmlResult) {
         List<List<String>> rowsList = new ArrayList<>();
-
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             DocumentBuilder builder = factory.newDocumentBuilder();
             Document doc = builder.parse(new java.io.ByteArrayInputStream(xmlResult.getBytes(StandardCharsets.UTF_8)));
             doc.getDocumentElement().normalize();
-
-            NodeList columns = doc.getElementsByTagName("column");
-            NodeList rows = doc.getElementsByTagName("row");
-
-            // Extract column headers
+    
+            // Extract column headers from the metadata section
+            NodeList columnNodes = doc.getElementsByTagName("column");
             List<String> headers = new ArrayList<>();
-            for (int i = 0; i < columns.getLength(); i++) {
-                Element column = (Element) columns.item(i);
-                if (column != null) {
-                    NodeList names = column.getElementsByTagName("name");
-                    if (names.getLength() > 0) {
-                        headers.add(names.item(0).getTextContent());
+            
+            // Add headers based on name tags
+            for (int i = 0; i < columnNodes.getLength(); i++) {
+                Node columnNode = columnNodes.item(i);
+                if (columnNode.getNodeType() == Node.ELEMENT_NODE) {
+                    Element columnElement = (Element) columnNode;
+                    Node nameNode = columnElement.getElementsByTagName("name").item(0);
+                    if (nameNode != null) {
+                        String header = nameNode.getTextContent().trim();
+                        headers.add(header);
                     }
                 }
             }
-            rowsList.add(headers);
-
-            // Extract rows
-            for (int i = 0; i < rows.getLength(); i++) {
-                NodeList rowColumns = rows.item(i).getChildNodes();
+    
+            // Debugging: Print extracted headers
+        //    System.out.println("Extracted Headers: " + headers);
+    
+            // Add headers as the first row if they exist
+            if (!headers.isEmpty()) {
+                rowsList.add(headers);
+            }
+    
+            // Extract row data
+            NodeList rowNodes = doc.getElementsByTagName("row");
+            for (int i = 0; i < rowNodes.getLength(); i++) {
+                NodeList rowColumns = rowNodes.item(i).getChildNodes();
                 List<String> row = new ArrayList<>();
+                boolean isEmptyRow = true; // to track if all columns are empty
+    
                 for (int j = 0; j < rowColumns.getLength(); j++) {
-                    if (rowColumns.item(j) != null) {
-                        row.add(rowColumns.item(j).getTextContent());
+                    Node columnNode = rowColumns.item(j);
+                    if (columnNode.getNodeType() == Node.ELEMENT_NODE) {
+                        String value = columnNode.getTextContent().trim();
+                        if (!value.isEmpty()) {
+                            isEmptyRow = false;
+                        }
+                        row.add(value.isEmpty() ? "" : value);
                     }
                 }
-                rowsList.add(row);
+    
+                // If it's not an entirely empty row, add it
+                if (!isEmptyRow) {
+                    // Adjust row alignment: handle cases where the first value is missing (e.g., for Color)
+                    if (row.size() < headers.size()) {
+                        row.add(0, ""); // Add an empty value to the start if a column is missing
+                    }
+    
+                    rowsList.add(row);
+                }
             }
-
+    
         } catch (Exception e) {
             System.err.println("Error parsing XML response: " + e.getMessage());
             e.printStackTrace();
         }
-
+    
         return rowsList;
     }
 }

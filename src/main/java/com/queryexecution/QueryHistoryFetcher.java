@@ -31,6 +31,12 @@ public class QueryHistoryFetcher {
         this.httpFlag = httpFlag;
         this.timeInterval = timeInterval;
         this.queryId = queryId;
+
+        if (httpFlag == null) {
+            httpFlag.setSelected(false); // Set default to false
+        } else {
+            httpFlag = httpFlag;
+        }
     }
 
     // Fetch for loginType "I"

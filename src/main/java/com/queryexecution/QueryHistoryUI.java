@@ -30,6 +30,13 @@ public class QueryHistoryUI {
         QueryHistoryUI.loginType = loginType;
         QueryHistoryUI.httpFlag = httpFlag;
 
+        if (httpFlag == null) {
+            this.httpFlag = new CheckBox();
+            this.httpFlag.setSelected(false); // Set default to false
+        } else {
+            this.httpFlag = httpFlag;
+        }
+
         queryDetailFetcher = new QueryDetailFetcher(hostname, Config.QUERY_DETAIL_PORT); // Use the port from Config
 
         primaryStage.setTitle("Query History");

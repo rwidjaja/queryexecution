@@ -1,6 +1,8 @@
 package com.queryexecution;
 
 import javafx.application.Application;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -8,6 +10,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.beans.property.SimpleStringProperty;
 import java.util.List;
 
 public class QueryExecution extends Application {
@@ -19,15 +22,17 @@ public class QueryExecution extends Application {
     private ComboBox<String> cubeNameComboBox;
     private ComboBox<String> queryTypeComboBox;
     private TextArea queryTextArea;
-    private TableView<List<String>> resultTableView;
+    private TableView<ObservableList<String>> resultTableView;
     private Button executeButton;
     private Button loginButton;
     private Button queryHistoryButton;
     private Label statusLabel;
+    private CheckBox httpFlagCheckBox; // Added for HTTP/HTTPS
     private QueryExecutionEventHandler eventHandler;
 
     @Override
     public void start(Stage primaryStage) {
+        
         configureSSL();  // Handle any errors related to SSL configuration here
         eventHandler = new QueryExecutionEventHandler(this);
 
@@ -42,6 +47,9 @@ public class QueryExecution extends Application {
 
         Label passwordLabel = new Label("Password:");
         passwordField = new PasswordField();
+
+        httpFlagCheckBox = new CheckBox("Use HTTP");  // Added HTTP flag checkbox
+        httpFlagCheckBox.setSelected(false);  // Default to HTTPS
 
         loginButton = new Button("Login");
         statusLabel = new Label("Status: Not logged in");
@@ -93,8 +101,9 @@ public class QueryExecution extends Application {
         loginGrid.add(usernameField, 1, 1);
         loginGrid.add(passwordLabel, 0, 2);
         loginGrid.add(passwordField, 1, 2);
-        loginGrid.add(loginButton, 0, 3, 2, 1);
-        loginGrid.add(statusLabel, 0, 4, 2, 1);
+        loginGrid.add(httpFlagCheckBox, 0, 3); // Add checkbox for HTTP flag
+        loginGrid.add(loginButton, 0, 4, 2, 1);
+        loginGrid.add(statusLabel, 0, 5, 2, 1);
 
         TitledPane loginPane = new TitledPane("Login", loginGrid);
         loginPane.setCollapsible(false); // Ensure the pane is not collapsible
@@ -155,16 +164,33 @@ public class QueryExecution extends Application {
                 String jwtToken = eventHandler.getJwtToken(); // Use the token retrieved during login
                 String hostname = hostnameField.getText();
                 String loginType = eventHandler.getLoginType(); // Get the login type from event handler
-                CheckBox httpFlag = new CheckBox(); // Update with actual HTTP/HTTPS flag if applicable
+                boolean isHttpSelected = httpFlagCheckBox.isSelected(); // Use the selected value of the HTTP flag
 
                 // Create and show QueryHistoryUI
                 Stage queryHistoryStage = new Stage();
-                QueryHistoryUI queryHistoryUI = new QueryHistoryUI(queryHistoryStage, jwtToken, hostname, loginType, httpFlag);
+                QueryHistoryUI queryHistoryUI = new QueryHistoryUI(queryHistoryStage, jwtToken, hostname, loginType, httpFlagCheckBox);
                 queryHistoryStage.show(); // Use the show method to display the UI
             } catch (Exception ex) {
                 showError("Error displaying query history: " + ex.getMessage());
             }
         });
+    }
+
+    public void updateTableColumns(List<String> columnNames) {
+        resultTableView.getColumns().clear(); // Clear existing columns
+    
+        for (String columnName : columnNames) {
+            TableColumn<ObservableList<String>, String> column = new TableColumn<>(columnName);
+            column.setCellValueFactory(cellData -> {
+                int columnIndex = columnNames.indexOf(columnName);
+                return new SimpleStringProperty(cellData.getValue().get(columnIndex));
+            });
+            resultTableView.getColumns().add(column);
+        }
+    }
+
+    public void updateTableData(ObservableList<ObservableList<String>> data) {
+        resultTableView.setItems(data);
     }
 
     public TextField getHostnameField() {
@@ -195,7 +221,7 @@ public class QueryExecution extends Application {
         return queryTextArea;
     }
 
-    public TableView<List<String>> getResultTableView() {
+    public TableView<ObservableList<String>> getResultTableView() {
         return resultTableView;
     }
 
@@ -203,35 +229,36 @@ public class QueryExecution extends Application {
         return executeButton;
     }
 
-    public Button getQueryHistoryButton() {
-        return queryHistoryButton;
-    }
-
     public Button getLoginButton() {
         return loginButton;
+    }
+
+    public Button getQueryHistoryButton() {
+        return queryHistoryButton;
     }
 
     public Label getStatusLabel() {
         return statusLabel;
     }
 
-    public static void main(String[] args) {
-        launch(args);
+    public CheckBox getHttpFlagCheckBox() {
+        return httpFlagCheckBox;
+    }
+
+    private void showError(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Error");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 
     private void configureSSL() {
-        try {
-            // Set the path to your custom truststore and its password
-            System.setProperty("javax.net.ssl.trustStore", "./cacerts");
-            System.setProperty("javax.net.ssl.trustStorePassword", "password");
-        } catch (Exception e) {
-            showError("SSL configuration failed: " + e.getMessage());
-        }
+        System.setProperty("javax.net.ssl.trustStore", "./cacerts");
+        System.setProperty("javax.net.ssl.trustStorePassword", "password");
     }
 
-    // Changed visibility to protected
-    protected void showError(String message) {
-        statusLabel.setText("Error: " + message);
-        statusLabel.setStyle("-fx-text-fill: red;"); // Change text color to red for errors
+    public static void main(String[] args) {
+        launch(args);
     }
 }

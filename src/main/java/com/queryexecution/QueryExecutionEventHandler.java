@@ -3,15 +3,21 @@ package com.queryexecution;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.concurrent.Task;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 public class QueryExecutionEventHandler {
     private final QueryExecution ui;
     private String jwtToken;
     private String loginType;
+    private CheckBox httpFlag;
 
     public QueryExecutionEventHandler(QueryExecution ui) {
         this.ui = ui;
@@ -22,12 +28,19 @@ public class QueryExecutionEventHandler {
         String password = ui.getPasswordField().getText();
         String hostname = ui.getHostnameField().getText();
 
+        if (httpFlag == null) {
+            this.httpFlag = new CheckBox();
+            this.httpFlag.setSelected(false); // Set default to false
+        } else {
+            this.httpFlag = httpFlag;
+        }
+
         Task<Void> loginTask = new Task<>() {
             @Override
             protected Void call() {
                 try {
-                    // Check if the host is I-2024
                     boolean isI2024 = Authenticator.isI2024Host(hostname);
+                    httpFlag.setSelected(false);
 
                     if (isI2024) {
                         loginType = "I";
@@ -37,13 +50,11 @@ public class QueryExecutionEventHandler {
                         jwtToken = Authenticator.authenticateC2024(username, password, hostname);
                     }
 
-                    // Fetch and populate projects
-                    ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, hostname, loginType);
-                    List<String> projects = projectFetcher.fetchProjects();
+                    QueryProjectFetcher fetcher = new QueryProjectFetcher(jwtToken, hostname, loginType, httpFlag);
+                    Map<String, String> projects = fetcher.fetchProjects();
 
-                    // Update UI on the JavaFX Application Thread
                     Platform.runLater(() -> {
-                        ui.getProjectNameComboBox().getItems().setAll(projects);
+                        ui.getProjectNameComboBox().getItems().setAll(projects.values());
                         ui.getStatusLabel().setText("Status: Login successful");
                         ui.getExecuteButton().setDisable(false);
                         ui.getQueryHistoryButton().setDisable(false);
@@ -59,21 +70,34 @@ public class QueryExecutionEventHandler {
         new Thread(loginTask).start();
     }
 
-
-    public void handleProjectSelection() throws IOException {
+    public void handleProjectSelection() {
         String selectedProject = ui.getProjectNameComboBox().getValue();
         if (selectedProject != null) {
             Task<Void> fetchCubesTask = new Task<>() {
                 @Override
                 protected Void call() {
                     try {
-                        ProjectFetcher projectFetcher = new ProjectFetcher(jwtToken, ui.getHostnameField().getText(), loginType);
-                        List<String> cubes = projectFetcher.fetchCubesForProject(selectedProject);
+                        QueryProjectFetcher fetcher = new QueryProjectFetcher(jwtToken, ui.getHostnameField().getText(), loginType, httpFlag);
+                        Map<String, Map<String, String>> projectsAndCubes = fetcher.fetchProjectsAndCubes();
+                        
+                        String selectedProjectID = null;
+                        for (Map.Entry<String, String> entry : fetcher.fetchProjects().entrySet()) {
+                            if (entry.getValue().equals(selectedProject)) {
+                                selectedProjectID = entry.getKey();
+                                break;
+                            }
+                        }
+                        
+                        if (selectedProjectID != null) {
+                            Map<String, String> cubes = projectsAndCubes.get(selectedProjectID);
 
-                        // Update UI on the JavaFX Application Thread
-                        Platform.runLater(() -> {
-                            ui.getCubeNameComboBox().getItems().setAll(cubes);
-                        });
+                            Platform.runLater(() -> {
+                                ui.getCubeNameComboBox().getItems().setAll(cubes.values());
+                                ui.getCubeNameComboBox().setDisable(false);
+                            });
+                        } else {
+                            Platform.runLater(() -> ui.getCubeNameComboBox().setDisable(true));
+                        }
                     } catch (IOException ex) {
                         handleError("Network error while fetching cubes: " + ex.getMessage());
                     } catch (Exception ex) {
@@ -114,17 +138,17 @@ public class QueryExecutionEventHandler {
                     return List.of(List.of("Error executing query: " + ex.getMessage()));
                 }
             }
-
+    
             @Override
             protected void succeeded() {
                 List<List<String>> rows = getValue();
-                updateResultTable(rows);
+                updateResultTable(rows); // Update the result table
             }
-
+    
             @Override
             protected void failed() {
                 ui.getResultTableView().getItems().clear();
-                ui.getResultTableView().getItems().add(List.of("Error: " + getException().getMessage()));
+                ui.getResultTableView().getItems().add(FXCollections.observableArrayList(List.of("Error: " + getException().getMessage())));
             }
         };
         new Thread(executeQueryTask).start();
@@ -132,19 +156,28 @@ public class QueryExecutionEventHandler {
 
     private void updateResultTable(List<List<String>> results) {
         ui.getResultTableView().getColumns().clear(); // Clear existing columns
-
+    
         if (results.isEmpty()) return;
-
-        // Add columns based on the result set
-        for (int i = 0; i < results.get(0).size(); i++) {
-            TableColumn<List<String>, String> column = new TableColumn<>("Column " + (i + 1));
-            final int colIndex = i;
-            column.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().get(colIndex)));
-            ui.getResultTableView().getColumns().add(column);
+    
+        // Extract headers from the first row
+        List<String> headers = results.get(0);
+    
+        // Create columns based on the headers
+        ObservableList<TableColumn<ObservableList<String>, ?>> columns = FXCollections.observableArrayList();
+        for (int i = 0; i < headers.size(); i++) {
+            TableColumn<ObservableList<String>, String> column = new TableColumn<>(headers.get(i));
+            int columnIndex = i; // Capture the index to use in cellValueFactory
+            column.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().get(columnIndex)));
+            columns.add(column);
         }
-
-        // Add rows to the table
-        ui.getResultTableView().getItems().setAll(results);
+        ui.getResultTableView().getColumns().setAll(columns);
+    
+        // Add rows data
+        ObservableList<ObservableList<String>> observableData = FXCollections.observableArrayList();
+        for (int i = 1; i < results.size(); i++) { // Start from 1 to skip header row
+            observableData.add(FXCollections.observableArrayList(results.get(i)));
+        }
+        ui.updateTableData(observableData);
     }
 
     public String getJwtToken() {
